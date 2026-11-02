@@ -2,8 +2,6 @@ mod blobs;
 mod capture;
 mod clipboard;
 mod commands;
-mod models;
-mod mt;
 mod ocr;
 mod onnx;
 mod scroll;
@@ -75,10 +73,6 @@ pub fn run() {
             commands::ocr_image,
             commands::translate_texts,
             commands::test_translate,
-            commands::model_status,
-            commands::model_download,
-            commands::model_cancel,
-            commands::model_delete,
             commands::get_settings,
             commands::save_settings,
             commands::get_secret,

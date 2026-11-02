@@ -1,4 +1,4 @@
-//! ONNX Runtime 全局环境：一个进程只能有一个，OCR 和离线翻译共用
+//! ONNX Runtime 全局环境：一个进程只能有一个
 use std::sync::Mutex;
 
 use anyhow::anyhow;

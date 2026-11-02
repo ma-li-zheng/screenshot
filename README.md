@@ -33,10 +33,11 @@ Windows 桌面截图软件：快捷键截图、批注、钉在屏幕、离线文
 - 选区后点工具栏的「长截图」，然后在选区内滚动鼠标滚轮，或点「自动滚动」
 - 点「完成」后打开长图窗口，可以继续批注、复制、保存、钉图、OCR
 
-**翻译**
+**提取文字与翻译**
 
-- 在设置里选择服务商并填写密钥，三家都有每月免费额度
-- 软件会在本地统计每月用量，默认用到免费额度的 95% 就暂停翻译
+- 选区后点工具栏的「提取文字」，先显示识别结果；需要时再点窗口里的「翻译」
+- 翻译使用在线 API：腾讯云、百度、Azure（都有每月免费额度），或 OpenAI 兼容接口（DeepSeek、通义千问、本机 Ollama 等）
+- 在设置里选择服务并填写密钥；免费额度的服务会在本地统计每月用量，默认用到 95% 就暂停翻译
 
 ## 开发
 
@@ -67,7 +68,7 @@ src-tauri/src/       Rust 后端
   stitch.rs          长截图拼接算法
   scroll.rs          长截图采集
   ocr.rs             PaddleOCR 检测 + 识别
-  translate.rs       腾讯云 / 百度 / Azure 翻译
+  translate.rs       腾讯云 / 百度 / Azure / OpenAI 兼容接口翻译
 src-tauri/resources/
   ocr/               PP-OCRv5 mobile 模型（det.onnx / rec.onnx / dict.txt）
   runtime/           随安装包分发的 VC++ 运行库、DirectML.dll

@@ -9,7 +9,7 @@ use crate::capture::{CaptureSession, MonitorInfo};
 use crate::ocr::OcrLine;
 use crate::settings::{self, Settings, Usage};
 use crate::state::{AppState, ImageWin};
-use crate::{capture, clipboard, models, scroll, shortcut, translate, tray, windows_mgr};
+use crate::{capture, clipboard, scroll, shortcut, translate, tray, windows_mgr};
 
 type CmdResult<T> = Result<T, String>;
 
@@ -208,7 +208,6 @@ fn provider_name(p: &str) -> &'static str {
         "baidu" => "百度翻译",
         "azure" => "Azure 翻译",
         "openai" => "OpenAI 兼容接口",
-        "offline" => "内置离线模型",
         _ => "腾讯云翻译",
     }
 }
@@ -219,29 +218,6 @@ fn target_lang(s: &Settings, texts: &[String]) -> String {
         _ if translate::is_mostly_chinese(texts) => "en".into(),
         _ => "zh".into(),
     }
-}
-
-/// 内置离线模型翻译：to = en 用中→英模型，to = zh 用英→中模型
-async fn translate_offline(app: &AppHandle, texts: Vec<String>, to: &str) -> CmdResult<Vec<String>> {
-    let direction = if to == "en" { "zh-en" } else { "en-zh" };
-    if !models::installed(app, direction) {
-        let name = if to == "en" { "中→英" } else { "英→中" };
-        return Err(format!("离线翻译模型（{name}）还没有下载，请在 设置 → 翻译 中下载"));
-    }
-    let app = app.clone();
-    let direction = direction.to_string();
-    tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<Vec<String>> {
-        let st = app.state::<AppState>();
-        let mut cache = st.mt.lock().unwrap();
-        if !cache.contains_key(&direction) {
-            let t = crate::mt::Translator::load(&models::dir(&app, &direction))?;
-            cache.insert(direction.clone(), t);
-        }
-        cache.get_mut(&direction).unwrap().translate(&texts)
-    })
-    .await
-    .map_err(err)?
-    .map_err(|e| format!("离线翻译失败：{e:#}"))
 }
 
 async fn translate_online(app: &AppHandle, provider: &str, texts: &[String], to: &str) -> CmdResult<Vec<String>> {
@@ -280,31 +256,11 @@ async fn translate_online(app: &AppHandle, provider: &str, texts: &[String], to:
     Ok(out)
 }
 
-/// provider 为 None 时按设置选择引擎；"offline" 表示内置模型
 async fn do_translate(app: &AppHandle, provider: Option<String>, texts: Vec<String>) -> CmdResult<TranslateResult> {
     let s = app.state::<AppState>().settings.lock().unwrap().clone();
     let to = target_lang(&s, &texts);
-    let provider = provider.unwrap_or_else(|| {
-        if s.translate_engine == "offline" {
-            "offline".into()
-        } else {
-            s.translate_provider.clone()
-        }
-    });
-    let out = if provider == "offline" {
-        match translate_offline(app, texts.clone(), &to).await {
-            Ok(v) => Ok((v, provider)),
-            Err(e) if s.offline_fallback => translate_online(app, &s.translate_provider, &texts, &to)
-                .await
-                .map(|v| (v, s.translate_provider.clone()))
-                .map_err(|e2| format!("{e}
-改用在线翻译也失败了：{e2}")),
-            Err(e) => Err(e),
-        }
-    } else {
-        translate_online(app, &provider, &texts, &to).await.map(|v| (v, provider))
-    };
-    let (texts, provider) = out?;
+    let provider = provider.unwrap_or(s.translate_provider);
+    let texts = translate_online(app, &provider, &texts, &to).await?;
     Ok(TranslateResult {
         texts,
         to,
@@ -319,39 +275,8 @@ pub async fn translate_texts(app: AppHandle, texts: Vec<String>) -> CmdResult<Tr
 
 #[tauri::command]
 pub async fn test_translate(app: AppHandle, provider: String) -> CmdResult<String> {
-    let sample = if provider == "offline" {
-        vec!["截图工具支持文字识别和翻译。".to_string(), "Screenshots can be pinned to the desktop.".to_string()]
-    } else {
-        vec!["Hello, world!".to_string()]
-    };
-    let mut out = Vec::new();
-    for t in sample {
-        let r = do_translate(&app, Some(provider.clone()), vec![t.clone()]).await?;
-        out.push(format!("「{t}」→「{}」", r.texts.join("")));
-    }
-    Ok(out.join("  "))
-}
-
-// ---------------- 离线模型 ----------------
-
-#[tauri::command]
-pub fn model_status(app: AppHandle) -> Vec<models::ModelStatus> {
-    models::status(&app)
-}
-
-#[tauri::command]
-pub async fn model_download(app: AppHandle, direction: String, mirror: String) -> CmdResult<()> {
-    models::download(app, direction, mirror).await.map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
-pub fn model_cancel(app: AppHandle, direction: String) {
-    models::cancel(&app, &direction);
-}
-
-#[tauri::command]
-pub fn model_delete(app: AppHandle, direction: String) -> CmdResult<()> {
-    models::delete(&app, &direction).map_err(err)
+    let r = do_translate(&app, Some(provider), vec!["Hello, world!".to_string()]).await?;
+    Ok(format!("「Hello, world!」→「{}」", r.texts.join("")))
 }
 
 // ---------------- 设置 ----------------

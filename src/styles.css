@@ -510,6 +510,7 @@ textarea {
 }
 .ocr-left-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -685,4 +686,48 @@ html[data-view="settings"] body {
 .about {
   line-height: 22px;
   padding-bottom: 8px;
+}
+
+/* 界面出错时的提示 */
+.crash {
+  padding: 24px;
+  background: #fff;
+  height: 100%;
+}
+.crash-title {
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.crash-msg {
+  white-space: pre-wrap;
+  color: #cf1322;
+  background: #fff1f0;
+  border: 1px solid #ffccc7;
+  padding: 8px;
+  user-select: text;
+}
+.crash button {
+  height: 30px;
+  padding: 0 12px;
+}
+
+.ocr-left-bar button,
+.ocr-left-bar label,
+.ocr-actions button {
+  white-space: nowrap;
+}
+/* 窗口较窄时上下排列 */
+@media (max-width: 760px) {
+  .ocr-root {
+    flex-direction: column;
+  }
+  .ocr-left {
+    border-right: none;
+    border-bottom: 1px solid #e5e5e5;
+    min-height: 40%;
+  }
+  .ocr-right {
+    min-width: 0;
+  }
 }

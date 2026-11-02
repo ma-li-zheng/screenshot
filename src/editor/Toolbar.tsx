@@ -5,7 +5,6 @@ import {
   Droplet,
   Grid3x3,
   Highlighter,
-  Languages,
   Minus,
   MoveUpRight,
   Pencil,
@@ -23,7 +22,7 @@ import { useEditor } from "./store";
 import type { Tool } from "./types";
 import { COLORS, SIZES } from "./types";
 
-export type ToolbarAction = "undo" | "redo" | "long" | "ocr" | "translate" | "pin" | "save" | "cancel" | "done";
+export type ToolbarAction = "undo" | "redo" | "long" | "ocr" | "pin" | "save" | "cancel" | "done";
 
 const TOOLS: { tool: Tool; icon: ReactNode; tip: string }[] = [
   { tool: "rect", icon: <Square size={18} />, tip: "矩形" },
@@ -80,11 +79,8 @@ export function Toolbar({ style, mode, onAction, propsBelow = true }: Props) {
           <ScrollText size={18} />
         </button>
       )}
-      <button title="提取文字" onClick={() => onAction("ocr")}>
+      <button title="提取文字（识别后可翻译）" onClick={() => onAction("ocr")}>
         <ScanText size={18} />
-      </button>
-      <button title="翻译" onClick={() => onAction("translate")}>
-        <Languages size={18} />
       </button>
       <button title="钉在屏幕上" onClick={() => onAction("pin")}>
         <Pin size={18} />

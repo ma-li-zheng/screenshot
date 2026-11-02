@@ -50,8 +50,8 @@ export function OcrView() {
         const r = await invoke<OcrLine[]>("ocr_image", { key: v.key });
         setLines(r);
         setText(r.map((l) => l.text).join("\n"));
+        // 只做识别；翻译由用户点「翻译」再进行
         setStatus("ok");
-        if (v.mode === "translate") runTranslate(r);
       } catch (e) {
         setError(errorText(e));
         setStatus("error");
@@ -72,33 +72,12 @@ export function OcrView() {
   useEffect(() => {
     const c = trCanvas.current;
     if (!c || !img || !tr || !info) return;
-    c.width = info.width;
-    c.height = info.height;
-    const ctx = c.getContext("2d", { willReadFrequently: true })!;
-    ctx.drawImage(img, 0, 0);
-    lines.forEach((l, i) => {
-      const t = tr.texts[i];
-      if (!t) return;
-      const xs = l.box.map((p) => p[0]);
-      const ys = l.box.map((p) => p[1]);
-      const x = Math.max(0, Math.floor(Math.min(...xs)));
-      const y = Math.max(0, Math.floor(Math.min(...ys)));
-      const w = Math.min(info.width - x, Math.ceil(Math.max(...xs)) - x);
-      const h = Math.min(info.height - y, Math.ceil(Math.max(...ys)) - y);
-      if (w <= 2 || h <= 2) return;
-      const [bg, fg] = boxColors(ctx, x, y, w, h);
-      ctx.fillStyle = bg;
-      ctx.fillRect(x, y, w, h);
-      let fs = Math.max(8, h * 0.78);
-      ctx.font = `${fs}px ${FONT_FAMILY}`;
-      while (fs > 8 && ctx.measureText(t).width > w) {
-        fs -= 0.5;
-        ctx.font = `${fs}px ${FONT_FAMILY}`;
-      }
-      ctx.fillStyle = fg;
-      ctx.textBaseline = "middle";
-      ctx.fillText(t, x, y + h / 2, w);
-    });
+    try {
+      drawTranslated(c, img, info, lines, tr.texts);
+    } catch (e) {
+      setTrError(`生成译文图失败：${errorText(e)}`);
+      setShowTranslated(false);
+    }
   }, [img, tr, lines, info]);
 
   const overlay = useMemo(() => {
@@ -145,7 +124,8 @@ export function OcrView() {
       <div className="ocr-left">
         <div className="ocr-imgbox">
           <div className="ocr-imgwrap" style={{ display: showTranslated && tr ? "none" : undefined }}>
-            <img ref={imgRef} src={shotUrl(info.key)} onLoad={(e) => setImg(e.currentTarget)} draggable={false} style={{ maxWidth: "100%", width: info.width / devicePixelRatio }} />
+            {/* crossOrigin：否则画到 canvas 上会被视为跨源污染，无法读取像素 */}
+            <img ref={imgRef} src={shotUrl(info.key)} crossOrigin="anonymous" onLoad={(e) => setImg(e.currentTarget)} draggable={false} style={{ maxWidth: "100%", width: info.width / devicePixelRatio }} />
             <div className="ocr-overlay">{overlay}</div>
           </div>
           <canvas
@@ -212,6 +192,37 @@ export function OcrView() {
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
+}
+
+/** 在原图上把每个文字框替换成译文 */
+function drawTranslated(c: HTMLCanvasElement, img: HTMLImageElement, info: ImageWin, lines: OcrLine[], texts: string[]) {
+  c.width = info.width;
+  c.height = info.height;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0);
+  lines.forEach((l, i) => {
+    const t = texts[i];
+    if (!t) return;
+    const xs = l.box.map((p) => p[0]);
+    const ys = l.box.map((p) => p[1]);
+    const x = Math.max(0, Math.floor(Math.min(...xs)));
+    const y = Math.max(0, Math.floor(Math.min(...ys)));
+    const w = Math.min(info.width - x, Math.ceil(Math.max(...xs)) - x);
+    const h = Math.min(info.height - y, Math.ceil(Math.max(...ys)) - y);
+    if (w <= 2 || h <= 2) return;
+    const [bg, fg] = boxColors(ctx, x, y, w, h);
+    ctx.fillStyle = bg;
+    ctx.fillRect(x, y, w, h);
+    let fs = Math.max(8, h * 0.78);
+    ctx.font = `${fs}px ${FONT_FAMILY}`;
+    while (fs > 8 && ctx.measureText(t).width > w) {
+      fs -= 0.5;
+      ctx.font = `${fs}px ${FONT_FAMILY}`;
+    }
+    ctx.fillStyle = fg;
+    ctx.textBaseline = "middle";
+    ctx.fillText(t, x, y + h / 2, w);
+  });
 }
 
 /** 取文字框边缘像素的中位色作为背景，按亮度选文字颜色 */

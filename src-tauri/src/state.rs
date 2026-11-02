@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::capture::CaptureSession;
@@ -31,10 +31,6 @@ pub struct AppState {
     pub scroll: Mutex<Option<ScrollHandle>>,
     pub images: Mutex<HashMap<String, ImageWin>>,
     pub ocr: Mutex<Option<crate::ocr::Engine>>,
-    /// 已加载的离线翻译模型，按方向（zh-en / en-zh）
-    pub mt: Mutex<HashMap<String, crate::mt::Translator>>,
-    /// 正在下载的模型及其取消标志
-    pub downloads: Mutex<HashMap<String, Arc<AtomicBool>>>,
     seq: AtomicU64,
 }
 
@@ -47,8 +43,6 @@ impl AppState {
             scroll: Mutex::new(None),
             images: Mutex::new(HashMap::new()),
             ocr: Mutex::new(None),
-            mt: Mutex::new(HashMap::new()),
-            downloads: Mutex::new(HashMap::new()),
             seq: AtomicU64::new(1),
         }
     }

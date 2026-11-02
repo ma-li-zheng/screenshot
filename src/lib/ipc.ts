@@ -2,7 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 
 /** shot:// 协议在 Windows 上的访问地址 */
 export function shotUrl(key: string): string {
-  return `http://shot.localhost/${key}`;
+  // 开发预览时由 dev/mock 指定图片地址
+  const base = (window as unknown as { __SHOT_BASE__?: string }).__SHOT_BASE__ ?? "http://shot.localhost/";
+  return `${base}${key}`;
 }
 
 export type OutputAction = "copy" | "save" | "pin" | "ocr" | "translate";

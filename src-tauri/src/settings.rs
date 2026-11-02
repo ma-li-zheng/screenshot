@@ -22,12 +22,6 @@ pub struct Settings {
     pub image_format: String,
     pub file_name_prefix: String,
     pub autostart: bool,
-    /// offline（内置 Opus-MT）| online（在线 API）
-    pub translate_engine: String,
-    /// 离线模型未下载或失败时改用在线 API
-    pub offline_fallback: bool,
-    /// 模型下载源：modelscope | huggingface
-    pub model_mirror: String,
     /// tencent | baidu | azure | openai
     pub translate_provider: String,
     /// auto | zh | en
@@ -55,9 +49,6 @@ impl Default for Settings {
             image_format: "png".into(),
             file_name_prefix: "Screenshot".into(),
             autostart: false,
-            translate_engine: "offline".into(),
-            offline_fallback: false,
-            model_mirror: "modelscope".into(),
             translate_provider: "tencent".into(),
             translate_target: "auto".into(),
             azure_region: String::new(),

@@ -34,7 +34,6 @@ chrono = "0.4"
 keyring = { version = "3", features = ["windows-native"] }
 dirs = "6"
 tokio = { version = "1", features = ["time", "rt"] }
-unicode-normalization = "0.1"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [

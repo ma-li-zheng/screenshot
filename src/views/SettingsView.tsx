@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { errorText } from "../lib/ipc";
 
@@ -14,9 +13,6 @@ interface Settings {
   imageFormat: string;
   fileNamePrefix: string;
   autostart: boolean;
-  translateEngine: string;
-  offlineFallback: boolean;
-  modelMirror: string;
   translateProvider: string;
   translateTarget: string;
   azureRegion: string;
@@ -27,20 +23,6 @@ interface Settings {
   usage: Record<string, Usage>;
 }
 type Secrets = Record<string, Record<string, string>>;
-interface ModelStatus {
-  direction: string;
-  installed: boolean;
-  downloading: boolean;
-  size: number;
-  path: string;
-}
-interface ModelProgress {
-  direction: string;
-  received: number;
-  total: number;
-  state: "downloading" | "done" | "error" | "cancelled";
-  message: string;
-}
 type Msg = { ok: boolean; text: string } | null;
 
 interface Provider {
@@ -93,10 +75,6 @@ const OPENAI_PRESETS = [
   { name: "通义千问", url: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-plus" },
   { name: "本机 Ollama", url: "http://localhost:11434/v1", model: "qwen2.5:7b" },
 ];
-
-const DIRECTION_NAMES: Record<string, string> = { "zh-en": "中文 → 英文", "en-zh": "英文 → 中文" };
-
-const mb = (n: number) => `${Math.round(n / 1_000_000)} MB`;
 
 /** 把按键转换为快捷键字符串，例如 Alt+Shift+A */
 function toAccelerator(e: KeyboardEvent): string | null {
@@ -219,17 +197,6 @@ export function SettingsView() {
 
       <h2>翻译</h2>
       <div className="row">
-        <label>翻译引擎</label>
-        <div className="segmented">
-          <button className={s.translateEngine === "offline" ? "on" : ""} onClick={() => set("translateEngine", "offline")}>
-            内置离线模型
-          </button>
-          <button className={s.translateEngine !== "offline" ? "on" : ""} onClick={() => set("translateEngine", "online")}>
-            在线 API
-          </button>
-        </div>
-      </div>
-      <div className="row">
         <label>目标语言</label>
         <select value={s.translateTarget} onChange={(e) => set("translateTarget", e.target.value)}>
           <option value="auto">自动（原文中文→英文，其他→中文）</option>
@@ -238,17 +205,12 @@ export function SettingsView() {
         </select>
       </div>
 
-      {s.translateEngine === "offline" ? (
-        <OfflineBox s={s} set={set} persist={persist} setMsg={setMsg} />
-      ) : (
-        <OnlineBox s={s} set={set} month={month} secrets={secrets} setSecrets={setSecrets} persist={persist} setMsg={setMsg} reload={load} />
-      )}
+      <OnlineBox s={s} set={set} month={month} secrets={secrets} setSecrets={setSecrets} persist={persist} setMsg={setMsg} reload={load} />
 
       <h2>关于</h2>
       <div className="about">
         <div>Screenshot 1.0.0</div>
         <div className="muted">文字识别：PaddleOCR PP-OCRv5（Apache-2.0）</div>
-        <div className="muted">离线翻译：OPUS-MT，Helsinki-NLP（CC-BY-4.0）</div>
       </div>
 
       <div className="settings-footer">
@@ -267,117 +229,6 @@ interface BoxProps {
   set: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
   persist: () => Promise<string[]>;
   setMsg: (m: Msg) => void;
-}
-
-function OfflineBox({ s, set, persist, setMsg }: BoxProps) {
-  const [models, setModels] = useState<ModelStatus[]>([]);
-  const [progress, setProgress] = useState<Record<string, ModelProgress>>({});
-  const [testing, setTesting] = useState(false);
-
-  const refresh = () => invoke<ModelStatus[]>("model_status").then((m) => setModels(m ?? []));
-  useEffect(() => {
-    refresh();
-    const un = listen<ModelProgress>("model:progress", (e) => {
-      const p = e.payload;
-      setProgress((old) => ({ ...old, [p.direction]: p }));
-      if (p.state !== "downloading") refresh();
-      if (p.state === "error") setMsg({ ok: false, text: `${DIRECTION_NAMES[p.direction]} 模型下载失败：${p.message}` });
-      if (p.state === "done") setMsg({ ok: true, text: `${DIRECTION_NAMES[p.direction]} 模型已下载` });
-    });
-    return () => {
-      un.then((f) => f());
-    };
-  }, []);
-
-  const download = (direction: string) => {
-    setMsg(null);
-    setProgress((old) => ({ ...old, [direction]: { direction, received: 0, total: 1, state: "downloading", message: "" } }));
-    invoke("model_download", { direction, mirror: s.modelMirror }).catch(() => refresh());
-    setTimeout(refresh, 300);
-  };
-
-  const remove = async (direction: string) => {
-    if (!confirm(`删除「${DIRECTION_NAMES[direction]}」离线模型？`)) return;
-    await invoke("model_delete", { direction });
-    refresh();
-  };
-
-  const test = async () => {
-    setTesting(true);
-    setMsg(null);
-    try {
-      await persist();
-      const r = await invoke<string>("test_translate", { provider: "offline" });
-      setMsg({ ok: true, text: r });
-    } catch (e) {
-      setMsg({ ok: false, text: errorText(e) });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const online = PROVIDERS.find((p) => p.id === s.translateProvider)?.name ?? "在线 API";
-  return (
-    <div className="provider-box">
-      <div className="hint">
-        使用 Opus-MT 开源翻译模型，只支持中英互译，翻译全程在本机完成，不联网。日常短句够用；长句和专业文本建议改用在线 API。
-        每个方向约 120 MB，按需下载。
-      </div>
-      {models.map((m) => {
-        const p = progress[m.direction];
-        const busy = m.downloading || p?.state === "downloading";
-        return (
-          <div className="row model-row" key={m.direction}>
-            <label>{DIRECTION_NAMES[m.direction]}</label>
-            {busy ? (
-              <div className="usage">
-                <div className="usage-bar">
-                  <div style={{ width: `${p ? Math.min(100, (p.received / Math.max(1, p.total)) * 100) : 0}%` }} />
-                </div>
-                <span className="muted">{p && p.total > 1 ? `${mb(p.received)} / ${mb(p.total)}` : "连接中…"}</span>
-                <button onClick={() => invoke("model_cancel", { direction: m.direction })}>取消</button>
-              </div>
-            ) : m.installed ? (
-              <>
-                <span className="ok">✓ 已安装（{mb(m.size)}）</span>
-                <span className="grow" />
-                <button onClick={() => remove(m.direction)}>删除</button>
-              </>
-            ) : (
-              <>
-                <span className="muted">未下载</span>
-                <span className="grow" />
-                <button className="primary" onClick={() => download(m.direction)}>
-                  下载
-                </button>
-              </>
-            )}
-          </div>
-        );
-      })}
-      <div className="row">
-        <label>下载源</label>
-        <select value={s.modelMirror} onChange={(e) => set("modelMirror", e.target.value)}>
-          <option value="modelscope">ModelScope 魔搭（国内，推荐）</option>
-          <option value="huggingface">Hugging Face（海外）</option>
-        </select>
-      </div>
-      {models[0] && <div className="hint">保存位置：{models[0].path.replace(/[\\/][^\\/]+$/, "")}</div>}
-      <div className="row">
-        <label>失败时</label>
-        <label className="check">
-          <input type="checkbox" checked={s.offlineFallback} onChange={(e) => set("offlineFallback", e.target.checked)} />
-          模型未下载或翻译失败时，改用在线 API（{online}）
-        </label>
-      </div>
-      <div className="row">
-        <label />
-        <button onClick={test} disabled={testing || !models.some((m) => m.installed)}>
-          {testing ? "测试中…" : "测试离线翻译"}
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function OnlineBox({

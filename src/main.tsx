@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from "react";
 import { createRoot } from "react-dom/client";
+import { ErrorBoundary } from "./ErrorBoundary";
 import "./styles.css";
 
 // 开发时在普通浏览器里预览界面
@@ -36,7 +37,9 @@ const views: Record<string, LazyExoticComponent<ComponentType>> = {
 const View = views[view] ?? views.settings;
 
 createRoot(document.getElementById("root")!).render(
-  <Suspense fallback={null}>
-    <View />
-  </Suspense>,
+  <ErrorBoundary>
+    <Suspense fallback={null}>
+      <View />
+    </Suspense>
+  </ErrorBoundary>,
 );
