@@ -15,6 +15,7 @@ import {
   Square,
   Type,
   Undo2,
+  Video,
   X,
 } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
@@ -22,7 +23,7 @@ import { useEditor } from "./store";
 import type { Tool } from "./types";
 import { COLORS, SIZES } from "./types";
 
-export type ToolbarAction = "undo" | "redo" | "long" | "ocr" | "pin" | "save" | "cancel" | "done";
+export type ToolbarAction = "undo" | "redo" | "long" | "record" | "ocr" | "pin" | "save" | "cancel" | "done";
 
 const TOOLS: { tool: Tool; icon: ReactNode; tip: string }[] = [
   { tool: "rect", icon: <Square size={18} />, tip: "矩形" },
@@ -75,9 +76,14 @@ export function Toolbar({ style, mode, onAction, propsBelow = true }: Props) {
       </button>
       <span className="sep" />
       {mode === "capture" && (
-        <button title="长截图" onClick={() => onAction("long")}>
-          <ScrollText size={18} />
-        </button>
+        <>
+          <button title="长截图" onClick={() => onAction("long")}>
+            <ScrollText size={18} />
+          </button>
+          <button title="录屏" onClick={() => onAction("record")}>
+            <Video size={18} />
+          </button>
+        </>
       )}
       <button title="提取文字（识别后可翻译）" onClick={() => onAction("ocr")}>
         <ScanText size={18} />

@@ -8,7 +8,8 @@ if (import.meta.env.DEV && !("__TAURI_INTERNALS__" in window)) {
   (await import("./dev/mock")).installMock();
 }
 
-const view = location.hash.slice(1) || "settings";
+// 形如 #video=12：等号后面是窗口参数
+const [view, param = ""] = (location.hash.slice(1) || "settings").split("=");
 document.documentElement.dataset.view = view;
 
 // 屏蔽浏览器默认的右键菜单、刷新等行为
@@ -32,6 +33,9 @@ const views: Record<string, LazyExoticComponent<ComponentType>> = {
   image: named(() => import("./views/ImageView"), "ImageView"),
   "scroll-frame": named(() => import("./views/ScrollViews"), "ScrollFrame"),
   "scroll-ctrl": named(() => import("./views/ScrollViews"), "ScrollCtrl"),
+  "record-frame": named(() => import("./views/RecordViews"), "RecordFrame"),
+  "record-ctrl": named(() => import("./views/RecordViews"), "RecordCtrl"),
+  video: lazy(() => import("./views/VideoView").then((m) => ({ default: () => <m.VideoView id={param} /> }))),
   settings: named(() => import("./views/SettingsView"), "SettingsView"),
 };
 const View = views[view] ?? views.settings;

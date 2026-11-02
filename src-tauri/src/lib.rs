@@ -4,6 +4,7 @@ mod clipboard;
 mod commands;
 mod ocr;
 mod onnx;
+mod record;
 mod scroll;
 mod settings;
 mod shortcut;
@@ -77,6 +78,16 @@ pub fn run() {
             commands::save_settings,
             commands::get_secret,
             commands::set_secret,
+            commands::record_start,
+            commands::record_status,
+            commands::record_pause,
+            commands::record_mute,
+            commands::record_stop,
+            commands::file_info,
+            commands::file_copy,
+            commands::file_reveal,
+            commands::file_save_as,
+            commands::gif_save,
             commands::pick_folder,
             commands::open_settings,
             commands::hotkey_errors,

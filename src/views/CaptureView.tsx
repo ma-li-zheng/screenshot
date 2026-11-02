@@ -4,6 +4,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type Konva from "konva";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { Layer, Rect as KRect, Stage } from "react-konva";
+import { X } from "lucide-react";
 import { AnnotationLayer } from "../editor/AnnotationLayer";
 import { beginDraw, editorKey, endDraw, moveDraw } from "../editor/drawing";
 import { exportPng } from "../editor/exportImage";
@@ -35,12 +36,15 @@ interface CaptureInfo {
   monitor: MonitorInfo;
   focus: boolean;
   cursor: [number, number] | null;
+  /** shot：截图；record：选择录屏区域 */
+  mode: string;
 }
 interface Session {
   id: number;
   monitors: MonitorInfo[];
   focus: number;
   cursor: [number, number];
+  mode: string;
 }
 
 type Phase = "idle" | "hover" | "pressing" | "selecting" | "selected";
@@ -208,7 +212,7 @@ export function CaptureView() {
       const s = e.payload;
       const m = s.monitors[idx];
       if (!m) return;
-      begin({ session: s.id, monitor: m, focus: s.focus === idx, cursor: s.focus === idx ? s.cursor : null });
+      begin({ session: s.id, monitor: m, focus: s.focus === idx, cursor: s.focus === idx ? s.cursor : null, mode: s.mode });
     });
     const un2 = listen("capture:end", () => {
       resetLocal();
@@ -246,6 +250,10 @@ export function CaptureView() {
         await invoke("scroll_start", { x: sx, y: sy, w: Math.round(sel.w * dpr), h: Math.round(sel.h * dpr) });
         return;
       }
+      if (a === "record") {
+        await invoke("record_start", { x: sx, y: sy, w: Math.round(sel.w * dpr), h: Math.round(sel.h * dpr) });
+        return;
+      }
       const action: OutputAction = a === "done" ? "copy" : (a as OutputAction);
       busy.current = true;
       try {
@@ -273,6 +281,10 @@ export function CaptureView() {
         return finish();
       }
       if (phase === "selected") {
+        if (info.mode === "record") {
+          if (e.key === "Enter") act("record");
+          return;
+        }
         if (e.key === "Enter" || (ctrl && e.key.toLowerCase() === "c")) return void act("done");
         if (ctrl && e.key.toLowerCase() === "s") {
           e.preventDefault();
@@ -419,7 +431,7 @@ export function CaptureView() {
   const onDbl = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (phase !== "selected" || useEditor.getState().tool) return;
     const p = pos(e);
-    if (inside(sel, p.x, p.y)) act("done");
+    if (inside(sel, p.x, p.y)) act(info?.mode === "record" ? "record" : "done");
   };
 
   const onContext = (e: Konva.KonvaEventObject<PointerEvent>) => {
@@ -508,8 +520,25 @@ export function CaptureView() {
       {showMagnifier && <Magnifier mouse={mouse!} bg={bgRef.current} pixels={pixels.current} monitor={info!.monitor} W={W} H={H} />}
       {showToolbar && (
         <div ref={toolbarRef}>
-          <Toolbar mode="capture" style={tbStyle} onAction={act} propsBelow={propsBelow} />
+          {info?.mode === "record" ? (
+            <div className="toolbar-wrap" style={tbStyle}>
+              <div className="toolbar record-bar" onMouseDown={(e) => e.stopPropagation()}>
+                <button title="退出 (Esc)" className="danger" onClick={() => act("cancel")}>
+                  <X size={18} />
+                </button>
+                <button title="开始录制 (Enter)" className="primary rec" onClick={() => act("record")}>
+                  <span className="rec-dot" />
+                  <span>开始录制</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <Toolbar mode="capture" style={tbStyle} onAction={act} propsBelow={propsBelow} />
+          )}
         </div>
+      )}
+      {info?.mode === "record" && phase === "hover" && (
+        <div className="record-hint">拖拽选择录制区域，单击选择窗口或整个屏幕 · Esc 退出</div>
       )}
       <TextEditor />
       {toast && <div className="toast">{toast}</div>}

@@ -17,11 +17,18 @@ pub struct Usage {
 pub struct Settings {
     pub hotkey_capture: String,
     pub hotkey_pin: String,
+    pub hotkey_record: String,
     pub save_dir: String,
     /// png | jpg
     pub image_format: String,
     pub file_name_prefix: String,
     pub autostart: bool,
+    /// 录屏：帧率、画质（standard | high）、是否录鼠标、默认录哪些声音
+    pub record_fps: u32,
+    pub record_quality: String,
+    pub record_cursor: bool,
+    pub record_system_audio: bool,
+    pub record_mic: bool,
     /// tencent | baidu | azure | openai
     pub translate_provider: String,
     /// auto | zh | en
@@ -45,10 +52,16 @@ impl Default for Settings {
         Self {
             hotkey_capture: "Alt+Shift+A".into(),
             hotkey_pin: "Alt+Shift+P".into(),
+            hotkey_record: "Alt+Shift+R".into(),
             save_dir: save_dir.to_string_lossy().into_owned(),
             image_format: "png".into(),
             file_name_prefix: "Screenshot".into(),
             autostart: false,
+            record_fps: 30,
+            record_quality: "standard".into(),
+            record_cursor: true,
+            record_system_audio: true,
+            record_mic: false,
             translate_provider: "tencent".into(),
             translate_target: "auto".into(),
             azure_region: String::new(),

@@ -2,6 +2,12 @@
 const settings = {
   hotkeyCapture: "Alt+Shift+A",
   hotkeyPin: "Alt+Shift+P",
+  hotkeyRecord: "Alt+Shift+R",
+  recordFps: 30,
+  recordQuality: "standard",
+  recordCursor: true,
+  recordSystemAudio: true,
+  recordMic: false,
   saveDir: "C:\\Users\\me\\Pictures\\Screenshot",
   imageFormat: "png",
   fileNamePrefix: "Screenshot",
@@ -40,13 +46,23 @@ const responses: Record<string, unknown> = {
   },
   get_settings: { settings, month: "2026-11" },
   get_secret: {},
+  record_status: { recording: true, paused: false, seconds: 83.4, hasSys: true, hasMic: true, muteSys: false, muteMic: true, error: null },
+  file_info: { id: "1", path: "C:\Users\me\Pictures\Screenshot\Recording_20261102_150102.mp4", name: "Recording_20261102_150102.mp4", size: 3456789 },
 };
 
 export function installMock() {
   // 用不同的源（127.0.0.1 与 localhost）提供图片，模拟 shot:// 协议的跨源情况
   (window as unknown as Record<string, unknown>).__SHOT_BASE__ = "http://127.0.0.1:1420/src-tauri/";
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
-    invoke: async (cmd: string) => responses[cmd] ?? null,
+    invoke: async (cmd: string, args: unknown) => {
+      // 记录最后一次调用，方便在预览里检查
+      (window as unknown as Record<string, unknown>).__lastInvoke = { cmd, args };
+      if (cmd === "gif_save") {
+        (window as unknown as Record<string, unknown>).__gifBytes = args;
+        return "2";
+      }
+      return responses[cmd] ?? null;
+    },
     transformCallback: () => 0,
     metadata: { currentWindow: { label: "preview" }, currentWebview: { label: "preview", windowLabel: "preview" } },
   };

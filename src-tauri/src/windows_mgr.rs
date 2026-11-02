@@ -116,6 +116,30 @@ pub fn open_image_window(app: &AppHandle, png: Vec<u8>, mode: &str) -> anyhow::R
     Ok(())
 }
 
+/// 录屏结果窗口：预览、复制文件、打开文件夹、另存为、转 GIF
+pub fn open_video_window(app: &AppHandle, path: &std::path::Path) -> anyhow::Result<()> {
+    let st = app.state::<AppState>();
+    let id = st.next_id();
+    st.files.lock().unwrap().insert(id.to_string(), path.to_path_buf());
+    let label = format!("video-{id}");
+    let (cx, cy) = crate::win32::cursor_pos();
+    let mon = xcap::Monitor::from_point(cx, cy)?;
+    let scale = mon.scale_factor()? as f64;
+    let (lw, lh) = (880.0, 640.0);
+    let win = WebviewWindowBuilder::new(app, &label, WebviewUrl::App(format!("index.html#video={id}").into()))
+        .title("录屏完成")
+        .inner_size(lw, lh)
+        .min_inner_size(520.0, 400.0)
+        .visible(false)
+        .build()?;
+    let px = mon.x()? + ((mon.width()? as f64 - lw * scale) / 2.0) as i32;
+    let py = mon.y()? + ((mon.height()? as f64 - lh * scale) / 2.0) as i32;
+    win.set_position(PhysicalPosition::new(px, py))?;
+    win.show()?;
+    win.set_focus()?;
+    Ok(())
+}
+
 pub fn close_image_window(app: &AppHandle, label: &str) {
     let st = app.state::<AppState>();
     if let Some(info) = st.images.lock().unwrap().remove(label) {

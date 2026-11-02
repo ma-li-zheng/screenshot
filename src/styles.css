@@ -27,7 +27,9 @@ html[data-view="capture"] body {
 html[data-view="pin"],
 html[data-view="pin"] body,
 html[data-view="scroll-frame"],
-html[data-view="scroll-frame"] body {
+html[data-view="scroll-frame"] body,
+html[data-view="record-frame"],
+html[data-view="record-frame"] body {
   background: transparent;
   overflow: hidden;
 }
@@ -730,4 +732,211 @@ html[data-view="settings"] body {
   .ocr-right {
     min-width: 0;
   }
+}
+
+/* ---------------- 录屏 ---------------- */
+.record-frame {
+  position: fixed;
+  inset: 0;
+  border: 3px solid #f5222d;
+}
+html[data-view="record-ctrl"] body {
+  background: #1f1f1f;
+  overflow: hidden;
+}
+.record-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  padding: 0 8px;
+  background: #1f1f1f;
+  color: #fff;
+}
+.record-ctrl button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #eee;
+  cursor: pointer;
+}
+.record-ctrl button:hover:not(:disabled) {
+  background: #3a3a3a;
+}
+.record-ctrl button.off {
+  color: #888;
+}
+.record-ctrl .rc-stop {
+  background: #f5222d;
+  color: #fff;
+  padding: 0 12px;
+}
+.record-ctrl .rc-stop:hover:not(:disabled) {
+  background: #ff4d4f;
+}
+.rc-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 96px;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  cursor: move;
+}
+.rc-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f5222d;
+  animation: rc-blink 1s infinite;
+}
+.rc-dot.paused {
+  background: #faad14;
+  animation: none;
+}
+@keyframes rc-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+.rc-error {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #faad14;
+  color: #000;
+  text-align: center;
+  font-weight: bold;
+}
+.toolbar.record-bar .rec {
+  padding: 0 14px;
+  background: #f5222d;
+}
+.toolbar.record-bar .rec:hover {
+  background: #ff4d4f;
+}
+.rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+}
+.record-hint {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* 录屏完成窗口 */
+.video-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f5f5f5;
+}
+.video-player {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+}
+.video-player video {
+  max-width: 100%;
+  max-height: 100%;
+}
+.video-bar,
+.video-gif {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fff;
+  border-top: 1px solid #e5e5e5;
+}
+.video-file {
+  flex: 1;
+  min-width: 0;
+}
+.video-name {
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.video-file .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.video-root button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background: #fff;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.video-root button:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+.video-root button.primary {
+  background: #1677ff;
+  border-color: #1677ff;
+  color: #fff;
+}
+.video-root button.primary:hover {
+  background: #4096ff;
+  color: #fff;
+}
+.video-root select {
+  height: 28px;
+}
+.video-gif .usage-bar {
+  width: 160px;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.video-gif .usage-bar div {
+  height: 100%;
+  background: #1677ff;
+}
+.video-gif.done .ok,
+.video-msg.ok {
+  color: #389e0d;
+}
+.video-msg {
+  position: fixed;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff !important;
+}
+.video-msg.bad {
+  background: #cf1322;
 }

@@ -9,10 +9,16 @@ interface Usage {
 interface Settings {
   hotkeyCapture: string;
   hotkeyPin: string;
+  hotkeyRecord: string;
   saveDir: string;
   imageFormat: string;
   fileNamePrefix: string;
   autostart: boolean;
+  recordFps: number;
+  recordQuality: string;
+  recordCursor: boolean;
+  recordSystemAudio: boolean;
+  recordMic: boolean;
   translateProvider: string;
   translateTarget: string;
   azureRegion: string;
@@ -168,6 +174,11 @@ export function SettingsView() {
         <label>贴剪贴板图片</label>
         <HotkeyInput value={s.hotkeyPin} onChange={(v) => set("hotkeyPin", v)} />
       </div>
+      <div className="row">
+        <label>录屏</label>
+        <HotkeyInput value={s.hotkeyRecord} onChange={(v) => set("hotkeyRecord", v)} />
+        <span className="muted">录制中再按一次停止</span>
+      </div>
       <div className="hint">点击输入框后按下组合键；按 Backspace 清除。</div>
 
       <h2>保存</h2>
@@ -188,6 +199,39 @@ export function SettingsView() {
         <input value={s.fileNamePrefix} onChange={(e) => set("fileNamePrefix", e.target.value)} />
         <span className="muted">例：{s.fileNamePrefix}_20261102_103000.{s.imageFormat}</span>
       </div>
+
+      <h2>录屏</h2>
+      <div className="row">
+        <label>帧率</label>
+        <select value={s.recordFps} onChange={(e) => set("recordFps", Number(e.target.value))}>
+          <option value={15}>15 帧/秒（文件小）</option>
+          <option value={30}>30 帧/秒（推荐）</option>
+          <option value={60}>60 帧/秒（流畅）</option>
+        </select>
+      </div>
+      <div className="row">
+        <label>画质</label>
+        <select value={s.recordQuality} onChange={(e) => set("recordQuality", e.target.value)}>
+          <option value="standard">标准</option>
+          <option value="high">高（文件约大一倍）</option>
+        </select>
+      </div>
+      <div className="row">
+        <label>录制内容</label>
+        <label className="check">
+          <input type="checkbox" checked={s.recordCursor} onChange={(e) => set("recordCursor", e.target.checked)} />
+          鼠标指针
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={s.recordSystemAudio} onChange={(e) => set("recordSystemAudio", e.target.checked)} />
+          系统声音
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={s.recordMic} onChange={(e) => set("recordMic", e.target.checked)} />
+          麦克风
+        </label>
+      </div>
+      <div className="hint">声音来源在开始录制时确定；录制中可以在控制条上静音。视频保存到上面的保存目录（MP4）。</div>
 
       <h2>启动</h2>
       <div className="row">

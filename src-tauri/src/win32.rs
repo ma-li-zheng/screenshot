@@ -168,6 +168,62 @@ mod imp {
         }
     }
 
+    /// 把文件放到剪贴板（与资源管理器复制文件相同，可直接粘贴到微信、飞书、文件夹）
+    pub fn copy_files_to_clipboard(paths: &[std::path::PathBuf]) -> anyhow::Result<()> {
+        use windows::Win32::Foundation::HANDLE;
+        use windows::Win32::System::DataExchange::{CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData};
+        use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
+        const CF_HDROP: u32 = 15;
+        /// DROPFILES 结构
+        #[repr(C)]
+        struct DropFiles {
+            p_files: u32,
+            pt: POINT,
+            f_nc: i32,
+            f_wide: i32,
+        }
+        let mut wide: Vec<u16> = Vec::new();
+        for p in paths {
+            wide.extend(p.as_os_str().encode_wide_compat());
+            wide.push(0);
+        }
+        wide.push(0);
+        let header = std::mem::size_of::<DropFiles>();
+        unsafe {
+            let h = GlobalAlloc(GMEM_MOVEABLE, header + wide.len() * 2)?;
+            let ptr = GlobalLock(h) as *mut u8;
+            if ptr.is_null() {
+                anyhow::bail!("无法分配剪贴板内存");
+            }
+            std::ptr::write(
+                ptr as *mut DropFiles,
+                DropFiles {
+                    p_files: header as u32,
+                    pt: POINT::default(),
+                    f_nc: 0,
+                    f_wide: 1,
+                },
+            );
+            std::ptr::copy_nonoverlapping(wide.as_ptr() as *const u8, ptr.add(header), wide.len() * 2);
+            let _ = GlobalUnlock(h);
+            OpenClipboard(None)?;
+            let result = EmptyClipboard().and_then(|_| SetClipboardData(CF_HDROP, Some(HANDLE(h.0))).map(|_| ()));
+            let _ = CloseClipboard();
+            result?;
+        }
+        Ok(())
+    }
+
+    trait EncodeWide {
+        fn encode_wide_compat(&self) -> Vec<u16>;
+    }
+    impl EncodeWide for std::ffi::OsStr {
+        fn encode_wide_compat(&self) -> Vec<u16> {
+            use std::os::windows::ffi::OsStrExt;
+            self.encode_wide().collect()
+        }
+    }
+
     /// 让窗口不出现在任何截屏/录屏结果里（Win10 2004+）
     pub fn exclude_from_capture(hwnd: isize) {
         // 调试用：设置该环境变量后可以截到长截图控制条

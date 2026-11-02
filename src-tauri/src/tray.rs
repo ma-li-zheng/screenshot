@@ -8,16 +8,22 @@ use crate::{capture, windows_mgr};
 const TRAY_ID: &str = "main";
 
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let (cap, pin) = {
+    let (cap, pin, rec) = {
         let st = app.state::<AppState>();
         let s = st.settings.lock().unwrap();
-        (s.hotkey_capture.clone(), s.hotkey_pin.clone())
+        (s.hotkey_capture.clone(), s.hotkey_pin.clone(), s.hotkey_record.clone())
+    };
+    let rec_text = if crate::record::is_recording(app) {
+        format!("停止录屏\t{rec}")
+    } else {
+        format!("录屏\t{rec}")
     };
     Menu::with_items(
         app,
         &[
             &MenuItem::with_id(app, "capture", format!("截图\t{cap}"), true, None::<&str>)?,
             &MenuItem::with_id(app, "pin", format!("贴剪贴板图片\t{pin}"), true, None::<&str>)?,
+            &MenuItem::with_id(app, "record", rec_text, true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "settings", "设置", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
@@ -37,6 +43,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             // 等托盘菜单完全消失后再截图
             "capture" => capture::start(app, 200),
             "pin" => windows_mgr::pin_from_clipboard(app),
+            "record" => crate::record::toggle(app, 200),
             "settings" => windows_mgr::open_settings(app),
             "quit" => app.exit(0),
             _ => {}

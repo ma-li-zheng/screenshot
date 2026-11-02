@@ -38,6 +38,8 @@ pub struct CaptureSession {
     pub focus: usize,
     /// 光标位置（相对 focus 显示器，物理像素）
     pub cursor: (i32, i32),
+    /// shot（截图）| record（选择录屏区域）
+    pub mode: String,
 }
 
 pub fn overlay_label(i: usize) -> String {
@@ -46,12 +48,18 @@ pub fn overlay_label(i: usize) -> String {
 
 pub fn is_active(app: &AppHandle) -> bool {
     let st = app.state::<AppState>();
-    let active = st.capture.lock().unwrap().is_some() || st.scroll.lock().unwrap().is_some();
+    let active = st.capture.lock().unwrap().is_some()
+        || st.scroll.lock().unwrap().is_some()
+        || st.record.lock().unwrap().is_some();
     active
 }
 
 /// 从快捷键或托盘触发；在后台线程执行，避免阻塞事件循环
 pub fn start(app: &AppHandle, delay_ms: u64) {
+    start_with_mode(app, delay_ms, "shot");
+}
+
+pub fn start_with_mode(app: &AppHandle, delay_ms: u64, mode: &'static str) {
     if is_active(app) {
         return;
     }
@@ -60,7 +68,7 @@ pub fn start(app: &AppHandle, delay_ms: u64) {
         if delay_ms > 0 {
             std::thread::sleep(std::time::Duration::from_millis(delay_ms));
         }
-        if let Err(e) = start_inner(&app) {
+        if let Err(e) = start_inner(&app, mode) {
             eprintln!("capture failed: {e:?}");
             end(&app);
         }
@@ -74,7 +82,7 @@ struct Geo {
     h: u32,
 }
 
-fn start_inner(app: &AppHandle) -> anyhow::Result<()> {
+fn start_inner(app: &AppHandle, mode: &str) -> anyhow::Result<()> {
     let st = app.state::<AppState>();
     let id = st.next_id();
     let monitors = xcap::Monitor::all()?;
@@ -141,6 +149,7 @@ fn start_inner(app: &AppHandle) -> anyhow::Result<()> {
         monitors: infos,
         focus,
         cursor,
+        mode: mode.to_string(),
     };
     *st.capture.lock().unwrap() = Some(session.clone());
     ensure_overlays(app, &geos)?;

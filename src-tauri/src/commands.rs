@@ -23,6 +23,7 @@ fn err<E: std::fmt::Display>(e: E) -> String {
 #[serde(rename_all = "camelCase")]
 pub struct CaptureView {
     session: u64,
+    mode: String,
     monitor: MonitorInfo,
     focus: bool,
     cursor: Option<(i32, i32)>,
@@ -33,6 +34,7 @@ pub fn capture_view(s: &CaptureSession, label: &str) -> Option<CaptureView> {
     let m = s.monitors.get(idx)?.clone();
     Some(CaptureView {
         session: s.id,
+        mode: s.mode.clone(),
         monitor: m,
         focus: s.focus == idx,
         cursor: (s.focus == idx).then_some(s.cursor),
@@ -277,6 +279,147 @@ pub async fn translate_texts(app: AppHandle, texts: Vec<String>) -> CmdResult<Tr
 pub async fn test_translate(app: AppHandle, provider: String) -> CmdResult<String> {
     let r = do_translate(&app, Some(provider), vec!["Hello, world!".to_string()]).await?;
     Ok(format!("「Hello, world!」→「{}」", r.texts.join("")))
+}
+
+// ---------------- 录屏 ----------------
+
+#[tauri::command]
+pub fn record_start(app: AppHandle, x: i32, y: i32, w: u32, h: u32) {
+    std::thread::spawn(move || {
+        if let Err(e) = crate::record::start(&app, x, y, w, h) {
+            let _ = crate::record::stop(&app, true);
+            use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+            app.dialog()
+                .message(format!("{e:#}"))
+                .title("无法开始录屏")
+                .kind(MessageDialogKind::Error)
+                .show(|_| {});
+        }
+    });
+}
+
+#[tauri::command]
+pub fn record_status(app: AppHandle) -> crate::record::RecordStatus {
+    crate::record::status(&app)
+}
+
+#[tauri::command]
+pub fn record_pause(app: AppHandle, paused: bool) {
+    crate::record::set_paused(&app, paused);
+}
+
+#[tauri::command]
+pub fn record_mute(app: AppHandle, source: String, mute: bool) {
+    crate::record::set_mute(&app, &source, mute);
+}
+
+#[tauri::command]
+pub fn record_stop(app: AppHandle, cancel: bool) {
+    std::thread::spawn(move || {
+        if cancel {
+            let _ = crate::record::stop(&app, true);
+        } else {
+            crate::record::finish_and_show(&app);
+        }
+    });
+}
+
+// ---------------- 文件（录屏结果、GIF） ----------------
+
+fn file_path(app: &AppHandle, id: &str) -> CmdResult<std::path::PathBuf> {
+    app.state::<AppState>()
+        .files
+        .lock()
+        .unwrap()
+        .get(id)
+        .cloned()
+        .ok_or_else(|| "文件不存在".to_string())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileInfo {
+    id: String,
+    path: String,
+    name: String,
+    size: u64,
+}
+
+#[tauri::command]
+pub fn file_info(app: AppHandle, id: String) -> CmdResult<FileInfo> {
+    let p = file_path(&app, &id)?;
+    Ok(FileInfo {
+        size: std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0),
+        name: p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+        path: p.to_string_lossy().into_owned(),
+        id,
+    })
+}
+
+#[tauri::command]
+pub fn file_copy(app: AppHandle, id: String) -> CmdResult<()> {
+    let p = file_path(&app, &id)?;
+    crate::win32::copy_files_to_clipboard(&[p]).map_err(err)
+}
+
+#[tauri::command]
+pub fn file_reveal(app: AppHandle, id: String) -> CmdResult<()> {
+    let p = file_path(&app, &id)?;
+    std::process::Command::new("explorer")
+        .arg(format!("/select,{}", p.display()))
+        .spawn()
+        .map(|_| ())
+        .map_err(err)
+}
+
+#[tauri::command]
+pub async fn file_save_as(app: AppHandle, window: WebviewWindow, id: String) -> CmdResult<bool> {
+    use tauri_plugin_dialog::DialogExt;
+    let src = file_path(&app, &id)?;
+    let ext = src.extension().and_then(|e| e.to_str()).unwrap_or("mp4").to_string();
+    tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<bool> {
+        let name = src.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let picked = app
+            .dialog()
+            .file()
+            .set_parent(&window)
+            .set_file_name(&name)
+            .add_filter(ext.to_uppercase(), &[ext.as_str()])
+            .blocking_save_file();
+        let Some(dst) = picked else { return Ok(false) };
+        std::fs::copy(&src, dst.into_path()?)?;
+        Ok(true)
+    })
+    .await
+    .map_err(err)?
+    .map_err(err)
+}
+
+/// 保存前端生成的 GIF：与原视频同目录同名，返回新文件的 id
+#[tauri::command]
+pub fn gif_save(app: AppHandle, request: Request<'_>) -> CmdResult<String> {
+    let InvokeBody::Raw(bytes) = request.body() else {
+        return Err("需要 GIF 数据".into());
+    };
+    let src_id = request
+        .headers()
+        .get("x-source")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
+    let src = file_path(&app, &src_id)?;
+    let mut dst = src.with_extension("gif");
+    let mut n = 2;
+    while dst.exists() {
+        let stem = src.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        dst = src.with_file_name(format!("{stem}_{n}.gif"));
+        n += 1;
+    }
+    std::fs::write(&dst, bytes).map_err(err)?;
+    let st = app.state::<AppState>();
+    let id = st.next_id().to_string();
+    st.files.lock().unwrap().insert(id.clone(), dst);
+    Ok(id)
 }
 
 // ---------------- 设置 ----------------

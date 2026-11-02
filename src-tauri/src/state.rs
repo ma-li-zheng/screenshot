@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::capture::CaptureSession;
@@ -31,6 +32,9 @@ pub struct AppState {
     pub scroll: Mutex<Option<ScrollHandle>>,
     pub images: Mutex<HashMap<String, ImageWin>>,
     pub ocr: Mutex<Option<crate::ocr::Engine>>,
+    pub record: Mutex<Option<crate::record::RecordHandle>>,
+    /// 通过 shot://file/<id> 提供的本地文件（录屏结果）
+    pub files: Mutex<HashMap<String, PathBuf>>,
     seq: AtomicU64,
 }
 
@@ -43,6 +47,8 @@ impl AppState {
             scroll: Mutex::new(None),
             images: Mutex::new(HashMap::new()),
             ocr: Mutex::new(None),
+            record: Mutex::new(None),
+            files: Mutex::new(HashMap::new()),
             seq: AtomicU64::new(1),
         }
     }
